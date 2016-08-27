@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE RecordWildCards  #-}
 
 
@@ -108,14 +109,16 @@ ssZero = StreamState 0 0 Nothing Nothing 0 0
 ssSample :: StreamState
          -> Scientific
          -> StreamState
-ssSample s x =
-  let delta = (toRealFloat x) - (ssMean s)
-      n = (ssCount s) + 1
-      mean = (ssMean s) + delta / (fromIntegral n)
+ssSample !s !x =
+  let !delta = (toRealFloat x) - (ssMean s)
+      !n = (ssCount s) + 1
+      !mean = (ssMean s) + delta / (fromIntegral n)
+      !ssMin' = maybe x (min x) (ssMin s)
+      !ssMax' = maybe x (max x) (ssMax s)
    in StreamState { ssCount = n
                   , ssSum = (ssSum s) + x
-                  , ssMin = Just $ maybe x (min x) (ssMin s)
-                  , ssMax = Just $ maybe x (max x) (ssMax s)
+                  , ssMin = Just ssMin'
+                  , ssMax = Just ssMax'
                   , ssMean = mean
                   , ssM2 = (ssM2 s) + delta*((toRealFloat x) - mean)
                   }
