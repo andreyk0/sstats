@@ -22,10 +22,12 @@ executable sstats
 
   build-depends:       base
                      , attoparsec
+                     , bytestring
                      , conduit
                      , conduit-extra
                      , optparse-applicative
                      , scientific
+                     , transformers
 
   default-language:    Haskell2010
 

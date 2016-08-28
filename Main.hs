@@ -7,8 +7,11 @@ module Main where
 
 import           Args
 import           Control.Monad
+import           Control.Monad.IO.Class
+import qualified Data.Attoparsec.ByteString.Char8 as A8
+import           Data.ByteString (ByteString)
 import           Data.Conduit
-import           Data.List
+import           Data.Conduit.Binary as CB
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Scientific
@@ -67,9 +70,30 @@ printStreamState Args{..} StreamState{..} = do
   when (argVar && ssCount > 1) $ printS "VAR " $ fromFloatDigits resVar
 
 
-consumeInput :: String
-             -> StreamState
-consumeInput input = foldl' ssSample ssZero (map read (lines input))
+
+consumeInput :: StreamState
+             -> Sink Scientific IO StreamState
+consumeInput !s = do
+  maybeN <- await
+  case maybeN
+    of Nothing -> return s
+       Just n  -> consumeInput $ ssSample s n
+
+
+numParser :: A8.Parser Scientific
+numParser = A8.skipSpace >> A8.scientific
+
+
+numConduit :: Conduit ByteString IO Scientific
+numConduit = do
+  x <- await
+  case x
+    of Nothing -> return ()
+       Just bs -> do let pr = A8.parseOnly numParser bs
+                     case pr
+                       of Left e  -> liftIO $ hPutStrLn stderr $ "Parser error: " <> show e
+                          Right n -> yield n
+                     numConduit
 
 
 runMain :: Args
@@ -77,6 +101,5 @@ runMain :: Args
 runMain a@Args{..} = do
   hSetBinaryMode stdin True
   hSetBuffering stdin (BlockBuffering Nothing)
-
-  ss <- getContents >>= (return . consumeInput)
+  ss <- (sourceHandle stdin) =$= CB.lines =$= numConduit $$ (consumeInput ssZero)
   printStreamState a ss
