@@ -5,94 +5,19 @@
 module Main where
 
 
+import           Args
 import           Control.Monad
+import           Data.Conduit
 import           Data.List
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Scientific
 import           Data.Word
-import           Options.Applicative
-
-
-data Args = Args { argAvg :: Bool
-                 , argCount :: Bool
-                 , argMax :: Bool
-                 , argMin :: Bool
-                 , argSum :: Bool
-                 , argVar :: Bool
-                 , argFmt :: FPFormat
-                 , argNumDec :: Int
-                 } deriving (Show)
-
-argPrintAll :: Args
-            -> Args
-argPrintAll a@Args{..} =
-  if argAvg || argCount || argMax || argMin || argSum || argVar
-  then a
-  else Args True True True True True True argFmt argNumDec
-
-
-parseArgs :: Parser Args
-parseArgs = Args
-     <$> switch
-         ( long "average"
-        <> short 'a'
-        <> help "Print average.")
-     <*> switch
-         ( long "count"
-        <> short 'c'
-        <> help "Print record count.")
-     <*> switch
-         ( long "max"
-        <> short 'M'
-        <> help "Print max.")
-     <*> switch
-         ( long "min"
-        <> short 'm'
-        <> help "Print min.")
-     <*> switch
-         ( long "sum"
-        <> short 's'
-        <> help "Print sum.")
-     <*> switch
-         ( long "var"
-        <> short 'v'
-        <> help "Print variance.")
-     <*> option parseFpFormatArg
-         ( long "fp-format"
-        <> short 'F'
-        <> value Fixed
-        <> showDefault
-        <> help "Floating point format, 'e' (exponent), 'f' (fixed) or 'g' (generic)." )
-     <*> option auto
-         ( long "num-dec-places"
-        <> short 'D'
-        <> value 3
-        <> showDefault
-        <> help "Number of decimal places in the output." )
-
-
-parseFpFormatArg :: ReadM FPFormat
-parseFpFormatArg = eitherReader $ \s ->
-  case s
-    of "e" -> Right Exponent
-       "f" -> Right Fixed
-       "g" -> Right Generic
-       x   -> Left $ "Failed to parse floating point format " <> x <> ", expected 'e' 'f' or 'g'"
+import           System.IO
 
 
 main:: IO ()
-main = execParser opts >>= runMain . argPrintAll
-  where
-    opts = info (helper <*> parseArgs)
-      ( fullDesc
-     <> progDesc ( "Reads a stream of numbers from STDIN, computes a few stats."
-                <> "Singular stats are printed directly, multiple stats are prefixed with the name."
-                <> "If no options are given - all stats are printed by default."
-                <> "AVG and VAR are computed with Double precision, counter is 64b and SUM/MIN/MAX "
-                <> "use Scientific type."
-                 )
-     <> header "Reads a stream of numbers from STDIN, computes a few stats." )
+main = runWithArgs runMain
 
 
 data StreamState = StreamState { ssCount :: !Word64
@@ -102,6 +27,7 @@ data StreamState = StreamState { ssCount :: !Word64
                                , ssMean :: !Double
                                , ssM2 :: !Double -- https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
                                } deriving (Eq, Show)
+
 
 ssZero :: StreamState
 ssZero = StreamState 0 0 Nothing Nothing 0 0
@@ -149,5 +75,8 @@ consumeInput input = foldl' ssSample ssZero (map read (lines input))
 runMain :: Args
         -> IO ()
 runMain a@Args{..} = do
+  hSetBinaryMode stdin True
+  hSetBuffering stdin (BlockBuffering Nothing)
+
   ss <- getContents >>= (return . consumeInput)
   printStreamState a ss

@@ -18,7 +18,12 @@ executable sstats
 
   main-is:             Main.hs
 
+  other-modules:       Args
+
   build-depends:       base
+                     , attoparsec
+                     , conduit
+                     , conduit-extra
                      , optparse-applicative
                      , scientific
 
