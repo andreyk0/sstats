@@ -91,7 +91,7 @@ numConduit = do
     of Nothing -> return ()
        Just bs -> do let pr = A8.parseOnly numParser bs
                      case pr
-                       of Left e  -> liftIO $ hPutStrLn stderr $ "Parser error: " <> show e
+                       of Left e  -> liftIO $ hPutStrLn stderr $ "Parser error reading [" <> show bs <> "]: " <> show e
                           Right n -> yield n
                      numConduit
 
